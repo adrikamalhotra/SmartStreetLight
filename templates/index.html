@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - LoRa Smart Street Light System</title>
+  <link rel="stylesheet" href="/static/css/dashboard.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- NAVBAR -->
+  <header class="navbar">
+    <div style="display:flex; align-items:center; gap:1.25rem;">
+      <a href="/dashboard" class="nav-brand">
+        <div class="brand-icon">&#9889;</div>
+        <span>LoRa Smart Street Light</span>
+        <span class="badge-tech">ESP32 &bull; SX1276</span>
+      </a>
+
+      <nav class="nav-links">
+        <a href="/dashboard" class="nav-link active">Dashboard</a>
+        <a href="/alerts" class="nav-link">
+          Alerts
+          <span class="badge-counter" id="navAlertBadge">0</span>
+        </a>
+        {% if current_user.role == 'admin' %}
+        <a href="/simulation" class="nav-link">Fault Simulation &amp; Config</a>
+        {% endif %}
+        <a href="/reports" class="nav-link">Reports</a>
+      </nav>
+    </div>
+
+    <div class="nav-actions">
+      <!-- DUAL DATA SOURCE TOGGLE SWITCH -->
+      <div class="source-switch-container" title="Select Gateway Data Source">
+        <span style="font-size:0.7rem; color:var(--text-dim); margin-left:6px; font-weight:600; text-transform:uppercase;">Source:</span>
+        <button id="btnSourceSynthetic" class="source-btn {{ 'active-synthetic' if active_source == 'synthetic' else '' }}" onclick="switchDataSource('synthetic')">
+          &#9881; Synthetic
+        </button>
+        <button id="btnSourceHardware" class="source-btn {{ 'active-hardware' if active_source == 'hardware' else '' }}" onclick="switchDataSource('hardware')">
+          &#128225; Hardware (ESP32)
+        </button>
+      </div>
+
+      <!-- USER INFO -->
+      <div class="user-profile">
+        <span class="role-badge {{ 'role-admin' if current_user.role == 'admin' else 'role-user' }}">
+          {{ current_user.role }}
+        </span>
+        <span style="font-size:0.85rem; font-weight:500;">{{ current_user.username }}</span>
+        <a href="/logout" class="btn-logout" title="Sign Out">&#8677;</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-container">
+    <!-- GATEWAY MONITORING BAR -->
+    <div class="gateway-bar">
+      <div class="gateway-item">
+        <span class="pulse-dot online" id="gwPulseDot"></span>
+        <span class="gateway-label">Gateway:</span>
+        <span class="gateway-val" id="gwId">GW-LORA-CENTRAL-01</span>
+      </div>
+
+      <div class="gateway-item">
+        <span class="gateway-label">Connectivity:</span>
+        <span class="status-pill working" id="gwConnStatus">ONLINE</span>
+      </div>
+
+      <div class="gateway-item">
+        <span class="gateway-label">MQTT HiveMQ:</span>
+        <span class="gateway-val" id="gwMqttStatus" style="color:var(--status-working);">CONNECTED</span>
+      </div>
+
+      <div class="gateway-item">
+        <span class="gateway-label">Active Mode:</span>
+        <span class="status-pill working" id="gwActiveSource">SYNTHETIC SIMULATION</span>
+      </div>
+
+      <div class="gateway-item">
+        <span class="gateway-label">Packets Processed:</span>
+        <span class="gateway-val" id="gwPackets">0</span>
+      </div>
+
+      <div class="gateway-item">
+        <span class="gateway-label">Last Comm:</span>
+        <span class="gateway-val" id="gwLastSeen" style="font-size:0.75rem;">Just now</span>
+      </div>
+    </div>
+
+    <!-- 6 SUMMARY CARDS (AS STRICTLY REQUIRED IN SECTION 7) -->
+    <div class="summary-grid">
+      <!-- 1. Total Streetlight Nodes -->
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-title">Total Nodes</span>
+          <span class="metric-icon">&#128362;</span>
+        </div>
+        <div class="metric-value val-cyan" id="metricTotalNodes">--</div>
+        <div class="metric-footer">Installed Street Poles</div>
+      </div>
+
+      <!-- 2. Working Lights -->
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-title">Working Lights</span>
+          <span class="metric-icon">&#9989;</span>
+        </div>
+        <div class="metric-value val-working" id="metricWorkingLights">--</div>
+        <div class="metric-footer">Operating nominally</div>
+      </div>
+
+      <!-- 3. Failed Lights -->
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-title">Failed Lights</span>
+          <span class="metric-icon">&#9888;</span>
+        </div>
+        <div class="metric-value val-failed" id="metricFailedLights">0</div>
+        <div class="metric-footer">Critical &amp; Warning faults</div>
+      </div>
+
+      <!-- 4. Offline Nodes -->
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-title">Offline Nodes</span>
+          <span class="metric-icon">&#128268;</span>
+        </div>
+        <div class="metric-value val-offline" id="metricOfflineNodes">0</div>
+        <div class="metric-footer">Signal / Comms timeout</div>
+      </div>
+
+      <!-- 5. Total Power Consumption -->
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-title">Total Power</span>
+          <span class="metric-icon">&#9889;</span>
+        </div>
+        <div class="metric-value val-cyan" id="metricTotalPower">-- W</div>
+        <div class="metric-footer" id="metricPowerKw">-- kW current grid draw</div>
+      </div>
+
+      <!-- 6. Active Alerts -->
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-title">Active Alerts</span>
+          <span class="metric-icon">&#128680;</span>
+        </div>
+        <div class="metric-value val-warning" id="metricActiveAlerts">0</div>
+        <div class="metric-footer"><a href="/alerts" style="color:inherit; text-decoration:underline;">View live triage &rarr;</a></div>
+      </div>
+    </div>
+
+    <!-- CHARTS SECTION -->
+    <div class="charts-grid">
+      <!-- Power Trend Chart -->
+      <div class="chart-card">
+        <div class="section-header">
+          <div class="section-title">
+            <span>&#128200;</span> Total Power Consumption Over Time
+          </div>
+          <span style="font-size:0.75rem; color:var(--text-dim);">Live Grid Telemetry</span>
+        </div>
+        <div class="chart-container">
+          <canvas id="powerChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Status Breakdown Chart -->
+      <div class="chart-card">
+        <div class="section-header">
+          <div class="section-title">
+            <span>&#127856;</span> Streetlight Health Status
+          </div>
+          <span style="font-size:0.75rem; color:var(--text-dim);">Network Breakdown</span>
+        </div>
+        <div class="chart-container" style="display:flex; justify-content:center;">
+          <canvas id="statusChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- INDIVIDUAL STREETLIGHT MONITORING SECTION -->
+    <div class="dashboard-section">
+      <div class="section-header">
+        <div class="section-title">
+          <span>&#128161;</span> Individual Streetlight Monitoring
+        </div>
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <div class="filter-bar">
+            <button class="filter-pill active" onclick="filterNodes('all', this)">All</button>
+            <button class="filter-pill" onclick="filterNodes('working', this)">Working</button>
+            <button class="filter-pill" onclick="filterNodes('warning', this)">Warning</button>
+            <button class="filter-pill" onclick="filterNodes('failed', this)">Failed</button>
+            <button class="filter-pill" onclick="filterNodes('offline', this)">Offline</button>
+          </div>
+          {% if current_user.role == 'admin' %}
+          <button class="btn btn-primary btn-sm" onclick="openAddNodeModal()">+ Add Pole</button>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="data-table" id="nodesTable">
+          <thead>
+            <tr>
+              <th>Pole ID</th>
+              <th>LED Status</th>
+              <th>Brightness</th>
+              <th>Ambient Light</th>
+              <th>Power (W)</th>
+              <th>LoRa RSSI</th>
+              <th>Mode</th>
+              <th>Last Communication</th>
+              <th>Health Status</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="nodesTableBody">
+            <tr>
+              <td colspan="10" style="text-align:center; padding:2rem; color:var(--text-dim);">
+                Loading streetlight telemetry...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- DETAIL MODAL FOR INDIVIDUAL STREETLIGHT -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="font-size:1.1rem; display:flex; align-items:center; gap:8px;" id="modalPoleTitle">
+          <span>&#128161;</span> Streetlight Inspection
+        </h3>
+        <button class="modal-close" onclick="closeModal('detailModal')">&times;</button>
+      </div>
+      <div class="modal-body" id="modalDetailBody">
+        <!-- Injected via JavaScript -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal('detailModal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD POLE MODAL (ADMIN) -->
+  <div class="modal-overlay" id="addNodeModal">
+    <div class="modal-content" style="max-width:480px;">
+      <div class="modal-header">
+        <h3 style="font-size:1.1rem;">Add New Streetlight Pole</h3>
+        <button class="modal-close" onclick="closeModal('addNodeModal')">&times;</button>
+      </div>
+      <form onsubmit="submitAddNode(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Pole Identifier</label>
+            <input type="text" id="addPoleId" class="form-input" placeholder="e.g. POLE-009" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Location / Sector Description</label>
+            <input type="text" id="addLocationName" class="form-input" placeholder="e.g. West Highway Mile 14" required>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+            <div class="form-group">
+              <label class="form-label">Latitude</label>
+              <input type="number" step="any" id="addLat" class="form-input" value="28.6185">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Longitude</label>
+              <input type="number" step="any" id="addLon" class="form-input" value="77.2190">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn" onclick="closeModal('addNodeModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Street Pole</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script>
+    const USER_ROLE = "{{ current_user.role }}";
+    let CURRENT_DATA_SOURCE = "{{ active_source }}";
+  </script>
+  <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

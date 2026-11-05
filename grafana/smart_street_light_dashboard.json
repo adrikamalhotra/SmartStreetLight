@@ -1,0 +1,220 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "System Key Performance Indicators",
+      "type": "row"
+    },
+    {
+      "id": 1,
+      "title": "Total Streetlight Nodes",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) as value FROM nodes;",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Working Lights",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "options": {
+        "colorMode": "value",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) as value FROM nodes WHERE status = 'working';",
+          "refId": "A",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "fixedColor": "green", "mode": "fixed" } }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Failed Lights",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "options": {
+        "colorMode": "value",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) as value FROM nodes WHERE status IN ('failed', 'warning');",
+          "refId": "A",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "fixedColor": "red", "mode": "fixed" } }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Offline Nodes",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "options": {
+        "colorMode": "value",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) as value FROM nodes WHERE status = 'offline';",
+          "refId": "A",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "fixedColor": "grey", "mode": "fixed" } }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Total Grid Power (Watts)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "options": {
+        "colorMode": "value",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT ROUND(SUM(power_w), 1) as value FROM nodes;",
+          "refId": "A",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "watt", "color": { "fixedColor": "blue", "mode": "fixed" } }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Active Alerts",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "options": {
+        "colorMode": "value",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) as value FROM alerts WHERE status = 'active';",
+          "refId": "A",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "fixedColor": "orange", "mode": "fixed" } }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 101,
+      "title": "Power & Ambient Telemetry Over Time",
+      "type": "row"
+    },
+    {
+      "id": 7,
+      "title": "Total Streetlight Grid Power Draw",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "rawSql": "SELECT timestamp as time, SUM(power_w) as total_power_watts FROM telemetry_history GROUP BY strftime('%Y-%m-%d %H:%M', timestamp) ORDER BY time ASC;",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 15
+          },
+          "unit": "watt"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Network Health Distribution",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 6 },
+      "targets": [
+        {
+          "rawSql": "SELECT status, COUNT(*) as count FROM nodes GROUP BY status;",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "id": 102,
+      "title": "Individual Node Telemetry & Diagnostic Alerts",
+      "type": "row"
+    },
+    {
+      "id": 9,
+      "title": "Streetlight Nodes Status & RF Metrics",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 14, "x": 0, "y": 15 },
+      "targets": [
+        {
+          "rawSql": "SELECT pole_id, status, led_state, brightness, ROUND(ambient_lux, 1) as lux, ROUND(power_w, 1) as watts, lora_rssi, last_seen FROM nodes ORDER BY pole_id ASC;",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Active Critical & Warning System Alerts",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 10, "x": 14, "y": 15 },
+      "targets": [
+        {
+          "rawSql": "SELECT alert_id, pole_id, severity, fault_type, description, created_at FROM alerts WHERE status = 'active' ORDER BY created_at DESC;",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["lora", "iot", "smart-lighting", "esp32"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timezone": "browser",
+  "title": "LoRa Smart Street Light Automation System",
+  "uid": "smart-street-light-lora"
+}

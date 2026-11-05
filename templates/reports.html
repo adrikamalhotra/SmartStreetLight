@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reports &amp; Historical Telemetry - LoRa Smart Street Light</title>
+  <link rel="stylesheet" href="/static/css/dashboard.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="navbar">
+    <div style="display:flex; align-items:center; gap:1.25rem;">
+      <a href="/dashboard" class="nav-brand">
+        <div class="brand-icon">&#9889;</div>
+        <span>LoRa Smart Street Light</span>
+        <span class="badge-tech">ESP32 &bull; SX1276</span>
+      </a>
+
+      <nav class="nav-links">
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+        <a href="/alerts" class="nav-link">
+          Alerts
+          <span class="badge-counter" id="navAlertBadge">0</span>
+        </a>
+        {% if current_user.role == 'admin' %}
+        <a href="/simulation" class="nav-link">Fault Simulation &amp; Config</a>
+        {% endif %}
+        <a href="/reports" class="nav-link active">Reports</a>
+      </nav>
+    </div>
+
+    <div class="nav-actions">
+      <div class="user-profile">
+        <span class="role-badge {{ 'role-admin' if current_user.role == 'admin' else 'role-user' }}">{{ current_user.role }}</span>
+        <span>{{ current_user.username }}</span>
+        <a href="/logout" class="btn-logout" title="Sign Out">&#8677;</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-container">
+    <div style="margin-bottom:1.5rem;">
+      <h2 style="font-size:1.35rem; font-weight:700; display:flex; align-items:center; gap:8px;">
+        <span>&#128196;</span> System Reports &amp; Historical Telemetry Export
+      </h2>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">
+        Generate audit-ready energy consumption logs, failure incident reports, and system telemetry in CSV or formal PDF formats.
+      </p>
+    </div>
+
+    <!-- EXPORT ACTIONS CARDS -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1.25rem; margin-bottom:2rem;">
+      <!-- PDF Report Card -->
+      <div class="metric-card" style="border-top:3px solid var(--accent-cyan);">
+        <div class="metric-header">
+          <span class="metric-title">&#128196; Executive PDF Report</span>
+          <span class="status-pill working">AUDIT READY</span>
+        </div>
+        <p style="font-size:0.82rem; color:var(--text-muted); margin:0.75rem 0 1.25rem 0;">
+          Generates a complete executive PDF summary with total grid energy draw, operational streetlight counts, and active alert breakdown.
+        </p>
+        <a href="/api/reports/summary/pdf" class="btn btn-primary" style="justify-content:center;">
+          &#11015; Download Executive PDF Report
+        </a>
+      </div>
+
+      <!-- Alerts CSV Export -->
+      <div class="metric-card" style="border-top:3px solid var(--status-critical);">
+        <div class="metric-header">
+          <span class="metric-title">&#128680; Incident &amp; Fault Log (CSV)</span>
+          <span class="status-pill failed">DIAGNOSTIC</span>
+        </div>
+        <p style="font-size:0.82rem; color:var(--text-muted); margin:0.75rem 0 1.25rem 0;">
+          Export historical streetlight failures, overcurrent events, actuation discrepancies, and operator acknowledgment timestamps.
+        </p>
+        <a href="/api/reports/alerts/csv" class="btn" style="justify-content:center;">
+          &#11015; Download Alerts CSV
+        </a>
+      </div>
+
+      <!-- Filtered Telemetry Export -->
+      <div class="metric-card" style="border-top:3px solid var(--status-warning);">
+        <div class="metric-header">
+          <span class="metric-title">&#128202; Raw Telemetry History</span>
+          <span class="status-pill warning">SENSOR LOGS</span>
+        </div>
+        <p style="font-size:0.82rem; color:var(--text-muted); margin:0.75rem 0 1.25rem 0;">
+          Export time-series readings: ambient lux, wattage, line voltage, PIR triggers, and LoRa RSSI link metrics.
+        </p>
+        <button class="btn" style="justify-content:center;" onclick="downloadFilteredCsv()">
+          &#11015; Download Telemetry CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- FILTER CRITERIA BOX -->
+    <div class="dashboard-section">
+      <div class="section-header">
+        <div class="section-title">
+          <span>&#128269;</span> Telemetry Filter Parameters
+        </div>
+        <span style="font-size:0.75rem; color:var(--text-dim);">Applies to raw telemetry CSV download</span>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:1rem;">
+        <div class="form-group">
+          <label class="form-label">Street Pole</label>
+          <select id="filterPole" class="form-select">
+            <option value="all">All Street Poles</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Data Source</label>
+          <select id="filterSource" class="form-select">
+            <option value="all">All Sources</option>
+            <option value="synthetic">Synthetic Simulation Only</option>
+            <option value="hardware">ESP32 Hardware Only</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Start Date</label>
+          <input type="date" id="filterStartDate" class="form-input">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">End Date</label>
+          <input type="date" id="filterEndDate" class="form-input">
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    async function initReportsPage() {
+      try {
+        const res = await fetch('/api/nodes');
+        const nodes = await res.json();
+        const sel = document.getElementById('filterPole');
+        nodes.forEach(n => {
+          const opt = document.createElement('option');
+          opt.value = n.pole_id;
+          opt.textContent = `${n.pole_id} - ${n.location_name}`;
+          sel.appendChild(opt);
+        });
+
+        // Set default dates
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('filterEndDate').value = today;
+      } catch (e) {
+        console.error(e);
+      }
+
+      // Update badge
+      try {
+        const aRes = await fetch('/api/alerts?status=active');
+        const acts = await aRes.json();
+        document.getElementById('navAlertBadge').innerText = acts.length;
+      } catch (e) {}
+    }
+
+    function downloadFilteredCsv() {
+      const pole = document.getElementById('filterPole').value;
+      const source = document.getElementById('filterSource').value;
+      const start = document.getElementById('filterStartDate').value;
+      const end = document.getElementById('filterEndDate').value;
+
+      let url = `/api/reports/telemetry/csv?pole_id=${encodeURIComponent(pole)}&source=${encodeURIComponent(source)}`;
+      if (start) url += `&start_date=${encodeURIComponent(start)}`;
+      if (end) url += `&end_date=${encodeURIComponent(end)}`;
+
+      window.location.href = url;
+    }
+
+    initReportsPage();
+  </script>
+</body>
+</html>

@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fault Simulation &amp; Automation Settings - LoRa Smart Street Light</title>
+  <link rel="stylesheet" href="/static/css/dashboard.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="navbar">
+    <div style="display:flex; align-items:center; gap:1.25rem;">
+      <a href="/dashboard" class="nav-brand">
+        <div class="brand-icon">&#9889;</div>
+        <span>LoRa Smart Street Light</span>
+        <span class="badge-tech">ESP32 &bull; SX1276</span>
+      </a>
+
+      <nav class="nav-links">
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+        <a href="/alerts" class="nav-link">
+          Alerts
+          <span class="badge-counter" id="navAlertBadge">0</span>
+        </a>
+        <a href="/simulation" class="nav-link active">Fault Simulation &amp; Config</a>
+        <a href="/reports" class="nav-link">Reports</a>
+      </nav>
+    </div>
+
+    <div class="nav-actions">
+      <div class="user-profile">
+        <span class="role-badge role-admin">ADMIN</span>
+        <span>{{ current_user.username }}</span>
+        <a href="/logout" class="btn-logout" title="Sign Out">&#8677;</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-container">
+    <div style="margin-bottom:1.5rem;">
+      <h2 style="font-size:1.35rem; font-weight:700; display:flex; align-items:center; gap:8px;">
+        <span>&#9881;</span> Administrator Testing Panel &amp; Automation Calibration
+      </h2>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">
+        Inject diagnostic failure modes in real time to validate system alerts, or calibrate ambient light and motion thresholds.
+      </p>
+    </div>
+
+    <!-- NOTIFICATION BANNER -->
+    <div id="toastMessage" style="display:none; padding:0.75rem 1rem; border-radius:6px; font-size:0.85rem; margin-bottom:1rem; font-weight:600;"></div>
+
+    <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap:1.5rem;">
+      <!-- LEFT: FAULT SIMULATION PANEL -->
+      <div class="dashboard-section" style="margin-bottom:0;">
+        <div class="section-header">
+          <div class="section-title">
+            <span>&#128680;</span> Streetlight Fault Simulation Panel
+          </div>
+          <span class="status-pill warning">ADMIN TESTING</span>
+        </div>
+
+        <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">
+          Select a target streetlight node and trigger a failure condition. The fault detection engine will instantly register the anomaly, publish critical alerts, and update the dashboard in real time.
+        </p>
+
+        <div class="form-group">
+          <label class="form-label">Target Streetlight Node</label>
+          <select id="simTargetPole" class="form-select" style="font-family:var(--font-mono); font-size:0.9rem;">
+            <!-- Populated via JS -->
+          </select>
+        </div>
+
+        <div style="margin-bottom:1.25rem;">
+          <label class="form-label">Select Failure Condition to Inject:</label>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.6rem;">
+            <!-- LED Failure -->
+            <button class="btn btn-danger" onclick="injectSelectedFault('led_failure')">
+              &#128161; LED / Driver Failure
+            </button>
+
+            <!-- Power Failure -->
+            <button class="btn btn-danger" onclick="injectSelectedFault('power_failure')">
+              &#9889; Mains Power Cut (0V)
+            </button>
+
+            <!-- Node Disconnect -->
+            <button class="btn btn-danger" onclick="injectSelectedFault('node_disconnected')">
+              &#128268; Node Disconnection
+            </button>
+
+            <!-- LoRa Degradation -->
+            <button class="btn btn-danger" onclick="injectSelectedFault('lora_drop')">
+              &#128246; LoRa Signal Drop
+            </button>
+
+            <!-- Abnormal Power -->
+            <button class="btn btn-danger" onclick="injectSelectedFault('abnormal_power')">
+              &#128293; Power Surge (165W)
+            </button>
+
+            <!-- Gateway Drop -->
+            <button class="btn btn-danger" onclick="injectGatewayFault()">
+              &#127760; Gateway Drop
+            </button>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:0.5rem; margin-bottom:1.5rem;">
+          <!-- PIR Motion Simulation -->
+          <button class="btn btn-primary" onclick="triggerSimMotion()" style="flex:1;">
+            &#128102; Simulate PIR Motion (Boost 100%)
+          </button>
+          <!-- Clear Single Fault -->
+          <button class="btn" onclick="clearSelectedFault()">
+            &#10006; Clear Node Fault
+          </button>
+        </div>
+
+        <!-- ACTIVE INJECTED FAULTS -->
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+            <span style="font-size:0.8rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">
+              Active Injected Test Faults:
+            </span>
+            <button class="btn btn-sm" onclick="clearAllFaults()">Clear All Faults</button>
+          </div>
+          <div id="activeFaultsList" style="background:#0b111e; border:1px solid var(--border-subtle); border-radius:6px; padding:0.75rem; min-height:80px; font-size:0.8rem;">
+            Loading active test faults...
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: AUTOMATION CONFIGURATION PANEL -->
+      <div class="dashboard-section" style="margin-bottom:0;">
+        <div class="section-header">
+          <div class="section-title">
+            <span>&#9881;</span> Intelligent Streetlight Automation Settings
+          </div>
+          <span class="status-pill working">PERSISTED</span>
+        </div>
+
+        <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1.25rem;">
+          Configure ambient light thresholds for automatic switching and motion-adaptive brightness levels.
+        </p>
+
+        <form id="automationConfigForm" onsubmit="saveAutomationConfig(event)">
+          <!-- LDR ON Threshold -->
+          <div class="form-group">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
+              <label class="form-label">LDR Turn-ON Threshold (Dusk)</label>
+              <span id="valLdrOn" style="font-family:var(--font-mono); font-size:0.8rem; color:var(--accent-cyan);">50 Lux</span>
+            </div>
+            <input type="range" id="cfgLdrOn" min="10" max="150" step="5" class="form-input" style="padding:0; accent-color:var(--accent-cyan);" oninput="document.getElementById('valLdrOn').innerText = this.value + ' Lux'">
+            <small style="color:var(--text-dim); font-size:0.7rem;">Lights automatically turn ON when ambient light falls below this level.</small>
+          </div>
+
+          <!-- LDR OFF Threshold -->
+          <div class="form-group">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
+              <label class="form-label">LDR Turn-OFF Threshold (Dawn)</label>
+              <span id="valLdrOff" style="font-family:var(--font-mono); font-size:0.8rem; color:var(--accent-cyan);">200 Lux</span>
+            </div>
+            <input type="range" id="cfgLdrOff" min="100" max="400" step="10" class="form-input" style="padding:0; accent-color:var(--accent-cyan);" oninput="document.getElementById('valLdrOff').innerText = this.value + ' Lux'">
+            <small style="color:var(--text-dim); font-size:0.7rem;">Lights switch OFF into daylight power-saving mode above this level.</small>
+          </div>
+
+          <!-- Night Brightness -->
+          <div class="form-group">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
+              <label class="form-label">Standard Nighttime Brightness</label>
+              <span id="valNightBright" style="font-family:var(--font-mono); font-size:0.8rem; color:var(--accent-cyan);">80%</span>
+            </div>
+            <input type="range" id="cfgNightBright" min="20" max="100" step="5" class="form-input" style="padding:0; accent-color:var(--accent-cyan);" oninput="document.getElementById('valNightBright').innerText = this.value + '%'">
+          </div>
+
+          <!-- Motion Brightness -->
+          <div class="form-group">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
+              <label class="form-label">PIR Motion Boost Brightness</label>
+              <span id="valMotionBright" style="font-family:var(--font-mono); font-size:0.8rem; color:var(--accent-cyan);">100%</span>
+            </div>
+            <input type="range" id="cfgMotionBright" min="50" max="100" step="5" class="form-input" style="padding:0; accent-color:var(--accent-cyan);" oninput="document.getElementById('valMotionBright').innerText = this.value + '%'">
+          </div>
+
+          <!-- Motion Timeout -->
+          <div class="form-group">
+            <label class="form-label">Motion Boost Hold Duration (Seconds)</label>
+            <input type="number" id="cfgMotionTimeout" class="form-input" min="5" max="300" value="30">
+          </div>
+
+          <!-- Communication Timeout -->
+          <div class="form-group">
+            <label class="form-label">LoRa Heartbeat Timeout for Offline Flag (Seconds)</label>
+            <input type="number" id="cfgCommTimeout" class="form-input" min="15" max="300" value="45">
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:0.65rem;">
+            &#128190; Save Automation Parameters
+          </button>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    function showToast(msg, isSuccess = true) {
+      const t = document.getElementById('toastMessage');
+      t.style.display = 'block';
+      t.innerText = msg;
+      if (isSuccess) {
+        t.style.backgroundColor = 'rgba(16, 185, 129, 0.2)';
+        t.style.border = '1px solid #10b981';
+        t.style.color = '#10b981';
+      } else {
+        t.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+        t.style.border = '1px solid #ef4444';
+        t.style.color = '#ef4444';
+      }
+      setTimeout(() => { t.style.display = 'none'; }, 4000);
+    }
+
+    async function loadNodesDropdown() {
+      try {
+        const res = await fetch('/api/nodes');
+        const nodes = await res.json();
+        const sel = document.getElementById('simTargetPole');
+        sel.innerHTML = nodes.map(n => `<option value="${n.pole_id}">${n.pole_id} - ${n.location_name} (${n.status.toUpperCase()})</option>`).join('');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadActiveFaults() {
+      try {
+        const res = await fetch('/api/simulation/faults');
+        const faults = await res.json();
+        const container = document.getElementById('activeFaultsList');
+
+        const keys = Object.keys(faults);
+        if (keys.length === 0) {
+          container.innerHTML = '<span style="color:var(--text-dim);">&#9989; No active simulated faults. All nodes operating normally.</span>';
+          return;
+        }
+
+        container.innerHTML = keys.map(pole => `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid var(--border-subtle);">
+            <div>
+              <strong style="color:var(--status-critical); font-family:var(--font-mono);">${pole}:</strong>
+              <span style="color:var(--text-main); margin-left:6px;">${faults[pole]}</span>
+            </div>
+            <button class="btn btn-sm" onclick="clearFaultFor('${pole}')">&#10006; Clear</button>
+          </div>
+        `).join('');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function injectSelectedFault(faultType) {
+      const poleId = document.getElementById('simTargetPole').value;
+      if (!poleId) return;
+
+      try {
+        const res = await fetch('/api/simulation/inject', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pole_id: poleId, fault_type: faultType })
+        });
+        const data = await res.json();
+        showToast(data.message || `Injected ${faultType} on ${poleId}`);
+        loadActiveFaults();
+      } catch (e) {
+        showToast('Failed to inject fault: ' + e, false);
+      }
+    }
+
+    async function injectGatewayFault() {
+      try {
+        const res = await fetch('/api/simulation/inject', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pole_id: 'GATEWAY', fault_type: 'gateway_disconnect' })
+        });
+        const data = await res.json();
+        showToast("Simulated Central Gateway Disconnection!");
+        loadActiveFaults();
+      } catch (e) {
+        showToast('Failed to inject gateway fault', false);
+      }
+    }
+
+    async function triggerSimMotion() {
+      const poleId = document.getElementById('simTargetPole').value;
+      if (!poleId) return;
+
+      try {
+        const res = await fetch('/api/simulation/motion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pole_id: poleId })
+        });
+        const data = await res.json();
+        showToast(`Motion detected on ${poleId}! Brightness boosted to 100%`);
+      } catch (e) {
+        showToast('Error triggering motion', false);
+      }
+    }
+
+    async function clearSelectedFault() {
+      const poleId = document.getElementById('simTargetPole').value;
+      clearFaultFor(poleId);
+    }
+
+    async function clearFaultFor(poleId) {
+      try {
+        await fetch('/api/simulation/inject', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pole_id: poleId, fault_type: 'clear' })
+        });
+        showToast(`Cleared fault on ${poleId}`);
+        loadActiveFaults();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function clearAllFaults() {
+      const res = await fetch('/api/simulation/faults');
+      const faults = await res.json();
+      for (let k of Object.keys(faults)) {
+        await clearFaultFor(k);
+      }
+      showToast('Cleared all simulated faults!');
+    }
+
+    async function loadAutomationConfig() {
+      try {
+        const res = await fetch('/api/config');
+        const cfg = await res.json();
+
+        if (cfg.ldr_on_threshold) {
+          document.getElementById('cfgLdrOn').value = cfg.ldr_on_threshold;
+          document.getElementById('valLdrOn').innerText = cfg.ldr_on_threshold + ' Lux';
+        }
+        if (cfg.ldr_off_threshold) {
+          document.getElementById('cfgLdrOff').value = cfg.ldr_off_threshold;
+          document.getElementById('valLdrOff').innerText = cfg.ldr_off_threshold + ' Lux';
+        }
+        if (cfg.night_brightness) {
+          document.getElementById('cfgNightBright').value = cfg.night_brightness;
+          document.getElementById('valNightBright').innerText = cfg.night_brightness + '%';
+        }
+        if (cfg.motion_brightness) {
+          document.getElementById('cfgMotionBright').value = cfg.motion_brightness;
+          document.getElementById('valMotionBright').innerText = cfg.motion_brightness + '%';
+        }
+        if (cfg.motion_timeout_sec) {
+          document.getElementById('cfgMotionTimeout').value = cfg.motion_timeout_sec;
+        }
+        if (cfg.communication_timeout_sec) {
+          document.getElementById('cfgCommTimeout').value = cfg.communication_timeout_sec;
+        }
+      } catch (e) {
+        console.error("Failed to load config:", e);
+      }
+    }
+
+    async function saveAutomationConfig(e) {
+      e.preventDefault();
+      const payload = {
+        ldr_on_threshold: document.getElementById('cfgLdrOn').value,
+        ldr_off_threshold: document.getElementById('cfgLdrOff').value,
+        night_brightness: document.getElementById('cfgNightBright').value,
+        motion_brightness: document.getElementById('cfgMotionBright').value,
+        motion_timeout_sec: document.getElementById('cfgMotionTimeout').value,
+        communication_timeout_sec: document.getElementById('cfgCommTimeout').value
+      };
+
+      try {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        showToast(data.message || 'Configuration saved successfully!');
+      } catch (err) {
+        showToast('Error saving configuration', false);
+      }
+    }
+
+    // Initialize
+    loadNodesDropdown();
+    loadActiveFaults();
+    loadAutomationConfig();
+
+    // Alert badge count
+    async function updateBadge() {
+      try {
+        const res = await fetch('/api/alerts?status=active');
+        const active = await res.json();
+        document.getElementById('navAlertBadge').innerText = active.length;
+      } catch (e) {}
+    }
+    updateBadge();
+    setInterval(updateBadge, 3000);
+  </script>
+</body>
+</html>

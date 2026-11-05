@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - LoRa Smart Street Light System</title>
+  <link rel="stylesheet" href="/static/css/dashboard.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-hero">
+        <div style="display:inline-flex; align-items:center; justify-content:center; width:52px; height:52px; background:linear-gradient(135deg, #38bdf8, #2563eb); border-radius:12px; font-size:1.75rem; color:#fff; box-shadow:0 0 20px rgba(56, 189, 248, 0.4);">
+          &#9889;
+        </div>
+        <h1>Smart Street Light System</h1>
+        <p>LoRa Wireless Automation & Central Gateway</p>
+        <div style="display:flex; justify-content:center; gap:6px; margin-top:10px;">
+          <span class="badge-tech">ESP32</span>
+          <span class="badge-tech">LoRa SX1276</span>
+          <span class="badge-tech">HiveMQ Cloud</span>
+          <span class="badge-tech">Flask</span>
+        </div>
+      </div>
+
+      {% if error %}
+      <div style="background-color:rgba(239, 68, 68, 0.15); border:1px solid rgba(239, 68, 68, 0.4); color:#ef4444; padding:0.6rem 0.85rem; border-radius:6px; font-size:0.82rem; margin-bottom:1.25rem; text-align:center;">
+        {{ error }}
+      </div>
+      {% endif %}
+
+      <form method="POST" action="/login">
+        <div class="form-group">
+          <label class="form-label" for="username">Username</label>
+          <input type="text" id="username" name="username" class="form-input" placeholder="e.g. admin or user" required autofocus>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <label class="form-label" for="password">Password</label>
+          <input type="password" id="password" name="password" class="form-input" placeholder="Enter password" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:0.65rem; font-size:0.9rem;">
+          Sign In to Console
+        </button>
+      </form>
+
+      <div class="demo-credentials">
+        <div style="font-weight:600; color:var(--accent-cyan); margin-bottom:4px;">Demo Authentication Roles:</div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+          <span><strong>Administrator:</strong> admin / admin123</span>
+          <span class="role-badge role-admin">Full Access</span>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+          <span><strong>Field Operator:</strong> user / user123</span>
+          <span class="role-badge role-user">Read Only</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
