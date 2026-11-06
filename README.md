@@ -2,6 +2,7 @@
 
 A comprehensive, production-grade IoT streetlight management and automation platform powered by **ESP32**, **SX1276 LoRa wireless communication**, **HiveMQ Cloud MQTT**, **Python Flask**, and a **dark industrial monitoring dashboard**.
 
+**Live Demo:** https://smartstreetlight-0rz0.onrender.com
 ---
 
 ## 1. System Overview & Architecture
@@ -154,7 +155,7 @@ python run.py
 ### Step 4: Access the Web Dashboard
 Open your browser and navigate to:
 ```
-http://127.0.0.1:5000
+https://smartstreetlight-0rz0.onrender.com
 ```
 Log in using:
 - Admin: `admin` / `admin123`
@@ -187,3 +188,11 @@ python gateway/serial_gateway.py
 2. Add `smart_street_light.db` as your SQLite data source.
 3. Import `grafana/smart_street_light_dashboard.json`.
 4. Monitor the complete network on your Grafana displays.
+
+## 10. Deployment Platform: Render
+ Include:
+- Hosting platform: Render
+- Runtime: Python 3
+- Build command: pip install -r requirements.txt
+- Start command: gunicorn --workers 1 --bind 0.0.0.0:$PORT wsgi:app
+- Live URL: https://smartstreetlight-0rz0.onrender.com
