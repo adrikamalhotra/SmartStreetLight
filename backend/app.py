@@ -489,11 +489,20 @@ def api_download_summary_pdf():
         headers={"Content-Disposition": f"attachment;filename=streetlight_system_report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"}
     )
 
+_services_started = False
+
 def start_services():
-    """Initializes database and launches background simulator and MQTT worker"""
+    """Initializes database and launches background services"""
+    global _services_started
+
+    if _services_started:
+        return
+
     init_db()
     simulator_instance.start()
     mqtt_service_instance.start()
+
+    _services_started = True
 
 if __name__ == '__main__':
     start_services()

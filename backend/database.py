@@ -7,8 +7,11 @@ from backend.config import Config
 DB_PATH = Config.DATABASE_PATH
 
 def get_db_connection():
-    conn = sqlite3.connect(DB_PATH, timeout=20.0)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 30000")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA synchronous = NORMAL")
     return conn
 
 def init_db():
@@ -183,15 +186,25 @@ def init_db():
 
 def get_system_config(key, default=None):
     conn = get_db_connection()
-    row = conn.execute("SELECT value FROM system_config WHERE key = ?", (key,)).fetchone()
-    conn.close()
-    if row:
-        return row['value']
-    return default
+    try:
+        row = conn.execute(
+            "SELECT value FROM system_config WHERE key = ?", (key,)
+        ).fetchone()
+
+        if row:
+            return row['value']
+        return default
+    finally:
+        conn.close()
 
 def set_system_config(key, value):
     conn = get_db_connection()
-    conn.execute("INSERT INTO system_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                 (key, str(value)))
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute(
+            "INSERT INTO system_config (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (key, str(value))
+        )
+        conn.commit()
+    finally:
+        conn.close()
