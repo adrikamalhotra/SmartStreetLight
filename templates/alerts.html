@@ -1,0 +1,92 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alerts - LoRa Smart Street Light</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+
+<header class="navbar">
+    <div style="display:flex; align-items:center; gap:1.25rem;">
+        <a href="/dashboard" class="nav-brand">
+            <div class="brand-icon">&#9889;</div>
+            <span>LoRa Smart Street Light</span>
+            <span class="badge-tech">ESP32 &bull; SX1276</span>
+        </a>
+
+        <nav class="nav-links">
+            <a href="/dashboard" class="nav-link">Dashboard</a>
+            <a href="/alerts" class="nav-link active">Alerts</a>
+
+            {% if current_user.role == 'admin' %}
+            <a href="/simulation" class="nav-link">Fault Simulation &amp; Config</a>
+            {% endif %}
+
+            <a href="/reports" class="nav-link">Reports</a>
+        </nav>
+    </div>
+
+    <div class="nav-actions">
+        <div class="user-profile">
+            <span class="role-badge {{ 'role-admin' if current_user.role == 'admin' else 'role-user' }}">
+                {{ current_user.role }}
+            </span>
+            <span style="font-size:0.85rem;">{{ current_user.username }}</span>
+            <a href="/logout" class="btn-logout">&#8677;</a>
+        </div>
+    </div>
+</header>
+
+<main class="app-container">
+
+    <div class="section-header">
+        <div class="section-title">
+            &#9888; Streetlight Alerts
+        </div>
+        <a href="/dashboard" class="btn">Back to Dashboard</a>
+    </div>
+
+    <div class="dashboard-section">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Alert ID</th>
+                        <th>Pole ID</th>
+                        <th>Fault Type</th>
+                        <th>Severity</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th>Created At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in alerts %}
+                    <tr>
+                        <td>{{ alert['alert_id'] }}</td>
+                        <td>{{ alert['pole_id'] }}</td>
+                        <td>{{ alert['fault_type'] }}</td>
+                        <td>{{ alert['severity'] }}</td>
+                        <td>{{ alert['description'] }}</td>
+                        <td>{{ alert['status'] }}</td>
+                        <td>{{ alert['created_at'] }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" style="text-align:center; padding:2rem;">
+                            No alerts found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</main>
+
+</body>
+</html>
