@@ -56,10 +56,18 @@ def logout_page():
 def dashboard_page():
     return render_template('index.html')
 
+
 @app.route('/alerts')
 @login_required
 def alerts_page():
-    return render_template('alerts.html')
+    conn = get_db_connection()
+    alerts = conn.execute(
+        "SELECT * FROM alerts ORDER BY created_at DESC LIMIT 100"
+    ).fetchall()
+    conn.close()
+
+    return render_template('alerts.html', alerts=alerts)
+
 
 @app.route('/simulation')
 @admin_required
